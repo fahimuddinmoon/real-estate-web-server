@@ -27,14 +27,16 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        // await client.connect();
+        await client.connect();
         const usersCollection = client.db('estatesDb').collection('users');
+        const modeCollection = client.db('estatesDb').collection('mode');
         const pendingCollection = client.db('estatesDb').collection('pendingProperty');
         const verifyCollection = client.db('estatesDb').collection('verifyProperty');
         const wishesCollection = client.db('estatesDb').collection('wishProperty');
         const offerCollection = client.db('estatesDb').collection('offeredProperty');
         const reviewCollection = client.db('estatesDb').collection('reviewProperty');
         const advertiseCollection = client.db('estatesDb').collection('advertiseProperty');
+        const paymentCollection = client.db('estatesDb').collection('paymentProperty');
 
         //create User
         app.post('/users/:email', async (req, res) => {
@@ -46,6 +48,54 @@ async function run() {
                 return res.send(isExist)
             }
             const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
+
+
+        //get modeChange
+        app.post('/mode/Change/:email', async (req, res) => {
+            const data = req.body
+            const email = req.params.email
+            const query = { email }
+            const isExist = await  modeCollection.findOne(query)
+            if (isExist) {
+                return res.send(isExist)
+            }
+            const result = await modeCollection.insertOne(data)
+            res.send(result)
+        })
+
+        //get mode data
+        app.get('/mode/Change/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const result = await modeCollection.findOne(query)
+            res.send(result)
+        })
+        //update mode data 
+        app.patch('/mode/update/:id', async (req, res) => {
+            
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const UpdateInfo = {
+                $set: {
+                    mode: 'dark'
+                }
+            }
+            const result = await modeCollection.updateOne(filter, UpdateInfo)
+            res.send(result)
+        })
+        app.patch('/mode/update/light/:id', async (req, res) => {
+          
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const UpdateInfo = {
+                $set: {
+                    mode: 'light'
+                }
+            }
+            const result = await modeCollection.updateOne(filter, UpdateInfo)
+            
             res.send(result)
         })
 
@@ -337,6 +387,19 @@ async function run() {
             const result = await offerCollection.updateOne(filter, updateData)
             res.send(result)
         })
+        //after payment update
+        app.patch('/paymentData/update/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const updateData = {
+                $set: {
+                    status: 'paid'
+                }
+            }
+            const result = await offerCollection.updateOne(filter, updateData)
+            console.log(result)
+            res.send(result)
+        })
 
         app.delete('/rejectedProperty/delete/:id', async (req, res) => {
             const id = req.params.id
@@ -381,11 +444,41 @@ async function run() {
             const result = await advertiseCollection.find().toArray()
             res.send(result)
         })
-      
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100);
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+        });
+
+        app.post('/paymentData', async (req, res) => {
+            const data = req.body
+            const result = await paymentCollection.insertOne(data)
+            res.send(result)
+        })
+        app.get('/paymentData', async (req, res) => {
+            const result = await paymentCollection.find().toArray()
+            res.send(result)
+        })
+        app.get('/paymentData/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { agentEmail: email }
+            const result = await paymentCollection.find(query).toArray()
+            res.send(result)
+        })
+
 
         // Send a ping to confirm a successful connection
-        // await client.db("admin").command({ ping: 1 });
-        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
